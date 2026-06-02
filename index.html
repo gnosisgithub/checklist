@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apartment Walk-Through Checklist</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 14px; background: #f5f4f0; color: #1a1a1a; }
+
+  header { background: #1a1a1a; color: #fff; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; position: sticky; top: 0; z-index: 100; }
+  header h1 { font-size: 17px; font-weight: 600; letter-spacing: .02em; }
+  header .sub { font-size: 12px; color: #aaa; margin-top: 2px; }
+
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .progress-wrap { font-size: 12px; color: #ccc; white-space: nowrap; }
+  #prog-bar { width: 120px; height: 4px; background: #444; border-radius: 2px; margin-top: 4px; }
+  #prog-fill { height: 100%; background: #4caf82; border-radius: 2px; transition: width .3s; width: 0%; }
+
+  .btn { padding: 8px 16px; border-radius: 5px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .btn-export { background: #4caf82; color: #fff; }
+  .btn-export:hover { background: #3d9970; }
+  .btn-reset { background: transparent; color: #ccc; border: 1px solid #555; }
+  .btn-reset:hover { background: #333; color: #fff; }
+
+  main { max-width: 860px; margin: 24px auto; padding: 0 16px 60px; }
+
+  .meta-row { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .meta-row label { font-size: 12px; color: #666; display: block; margin-bottom: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .meta-row input { border: 1px solid #ddd; border-radius: 4px; padding: 7px 10px; font-size: 13px; width: 100%; background: #fff; }
+  .meta-row .meta-field { flex: 1; min-width: 160px; }
+
+  .section { background: #fff; border-radius: 8px; border: 1px solid #e0ded8; margin-bottom: 14px; overflow: hidden; }
+  .sec-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f9f8f5; border-bottom: 1px solid #e8e6e0; cursor: pointer; user-select: none; }
+  .sec-title { font-size: 14px; font-weight: 600; color: #1a1a1a; display: flex; align-items: center; gap: 8px; }
+  .sec-icon { font-size: 18px; }
+  .sec-meta { display: flex; align-items: center; gap: 8px; }
+  .sec-count { font-size: 12px; color: #888; }
+  .chevron { font-size: 12px; color: #aaa; transition: transform .2s; }
+  .section.collapsed .chevron { transform: rotate(-90deg); }
+  .section.collapsed .sec-body { display: none; }
+
+  .sec-body { padding: 0; }
+  .item { display: flex; align-items: flex-start; gap: 10px; padding: 9px 16px; border-top: 1px solid #f0ede8; }
+  .item:first-child { border-top: none; }
+  .item input[type=checkbox] { margin-top: 2px; flex-shrink: 0; width: 15px; height: 15px; accent-color: #4caf82; cursor: pointer; }
+  .item-text { flex: 1; }
+  .item-label { font-size: 13px; line-height: 1.5; cursor: pointer; color: #1a1a1a; }
+  .item-note { font-size: 11px; color: #999; margin-top: 2px; font-style: italic; }
+  .item.checked .item-label { color: #aaa; text-decoration: line-through; }
+
+  .comments-wrap { padding: 10px 16px 14px; border-top: 1px solid #f0ede8; background: #fdfcfa; }
+  .comments-label { font-size: 11px; font-weight: 600; color: #aaa; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+  .comments-wrap textarea { width: 100%; border: 1px solid #e0ded8; border-radius: 4px; padding: 8px 10px; font-size: 13px; font-family: Arial, sans-serif; resize: vertical; min-height: 56px; color: #444; background: #fff; line-height: 1.5; }
+  .comments-wrap textarea::placeholder { color: #ccc; }
+  .comments-wrap textarea:focus { outline: none; border-color: #4caf82; }
+
+  .status-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 3px; text-transform: uppercase; letter-spacing: .04em; }
+  .badge-ok { background: #e6f4ee; color: #2e7d5a; }
+  .badge-issue { background: #fdecea; color: #c0392b; }
+  .badge-na { background: #f0ede8; color: #888; }
+
+  .item-status { display: flex; gap: 4px; margin-top: 5px; }
+  .item-status button { font-size: 10px; padding: 2px 7px; border-radius: 3px; border: 1px solid #ddd; background: #fff; cursor: pointer; font-weight: 600; color: #888; }
+  .item-status button.active-ok { background: #e6f4ee; color: #2e7d5a; border-color: #a8d8be; }
+  .item-status button.active-issue { background: #fdecea; color: #c0392b; border-color: #f5b7b1; }
+  .item-status button.active-na { background: #f0ede8; color: #888; border-color: #ddd; }
+
+  .export-note { font-size: 12px; color: #888; text-align: center; margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Apartment Walk-Through Checklist</h1>
+    <div class="sub">NYC Co-op · Final Inspection</div>
+  </div>
+  <div class="header-right">
+    <div class="progress-wrap">
+      <span id="prog-label">0 / 0 checked</span>
+      <div id="prog-bar"><div id="prog-fill"></div></div>
+    </div>
+    <button class="btn btn-reset" onclick="resetAll()">Reset</button>
+    <button class="btn btn-export" onclick="exportToExcel()">⬇ Export to Excel</button>
+  </div>
+</header>
+
+<main>
+  <div class="meta-row">
+    <div class="meta-field"><label>Address</label><input type="text" id="meta-address" placeholder="123 West 57th St, Apt 14C"></div>
+    <div class="meta-field"><label>Date</label><input type="date" id="meta-date"></div>
+    <div class="meta-field"><label>Inspector</label><input type="text" id="meta-inspector" placeholder="Your name"></div>
+    <div class="meta-field"><label>Broker / Attorney</label><input type="text" id="meta-broker" placeholder="Contact name"></div>
+  </div>
+
+  <div id="sections"></div>
+  <p class="export-note">Click "Export to Excel" to save your completed checklist as a .xlsx file.</p>
+</main>
+
+<script>
+const sections = [
+  { icon: "🏠", title: "General Condition", items: [
+    { text: "Apartment delivered broom-clean", note: "No debris, paint cans, old tiles, or unwanted furniture in closets, storage, or basement" },
+    { text: "Floors: inspect tiles, stains, scratches, gouges", note: "Known issues: missing kitchen tiles, living room stain" },
+    { text: "Floors: check for water warping or soft spots" },
+    { text: "Check under rugs or furniture if still present" },
+    { text: "Walls & ceilings: cracks, stains, bubbling paint, signs of leaks" },
+    { text: "Ceiling corners: inspect for water damage or uneven patches" },
+    { text: "Fresh paint checked for concealed water damage underneath" },
+    { text: "Owner patched and painted all wall holes", note: "Confirm completed before closing" },
+  ]},
+  { icon: "🚪", title: "Doors & Cabinetry", items: [
+    { text: "Every room door: opens, closes, latches properly, no dragging" },
+    { text: "Every closet door: opens, closes, latches properly" },
+    { text: "Every kitchen cabinet and drawer opens and closes smoothly" },
+    { text: "All hinges and handles are secure" },
+  ]},
+  { icon: "🪟", title: "Windows", items: [
+    { text: "Open and close every window fully" },
+    { text: "All windows lock properly" },
+    { text: "Check window seals and sashes; check for drafts" },
+    { text: "Foggy double-pane glass (blown seal)" },
+    { text: "No cracked glass; balances and sash cords working" },
+    { text: "Window screens present and intact" },
+    { text: "Window shades/blinds present and functional" },
+    { text: "Walls and sills around windows: staining or softness" },
+  ]},
+  { icon: "⚡", title: "Electrical", items: [
+    { text: "Test every outlet — both plugs (use phone charger)" },
+    { text: "GFCI outlets in kitchen and bathroom: trip and reset properly" },
+    { text: "All light switches work, including any governing outlets" },
+    { text: "Dimmers and multi-way switches work" },
+    { text: "Every light fixture turns on; bulbs and fixtures work" },
+    { text: "Ceiling fan: all speed settings and fan light work" },
+    { text: "Breaker panel: located, no tripped/unlabeled breakers, no scorching, heat, or buzzing" },
+  ]},
+  { icon: "🍳", title: "Kitchen", items: [
+    { text: "Stove: all burners turn on and heat up" },
+    { text: "Oven: set to 350°F and verify it heats properly; no gas smell" },
+    { text: "Dishwasher: run express cycle — fills, runs, drains completely, no leaks" },
+    { text: "Refrigerator/freezer: compressor running, cools, no unusual noise or leaking; check behind unit" },
+    { text: "Microwave: heating function works" },
+    { text: "Vent hood/exhaust fan: fan and light work" },
+    { text: "Under sink: run water, check joints, P-trap, shut-off valves, cabinet bottom for moisture" },
+  ]},
+  { icon: "🚿", title: "Plumbing & Bathrooms", items: [
+    { text: "Flood test: run all faucets simultaneously for 3–5 minutes" },
+    { text: "Hot water, cold water, and pressure consistent at all faucets" },
+    { text: "All sinks and tubs drain properly — no slow drainage or backups" },
+    { text: "Shower: test pressure and hot water temperature" },
+    { text: "Toilet: flush multiple times — no weak flush, running fill valve, leaks at base, or wobbling" },
+    { text: "Leak check: under sinks, around toilet base, radiators/HVAC, ceiling corners, near windows" },
+  ]},
+  { icon: "🌡️", title: "Heating & Cooling", items: [
+    { text: "Heat turned on briefly — radiators or HVAC units respond" },
+    { text: "AC turned on briefly — fan blows, air cools, digital controls work" },
+    { text: "No clanking, hissing, grinding, or rattling sounds" },
+    { text: "No leaks beneath radiator or HVAC units" },
+    { text: "PTAC/through-wall AC: fan, cooling, and control panel verified" },
+  ]},
+  { icon: "🫧", title: "Laundry (if in unit)", items: [
+    { text: "Washer: run short cycle — fills, agitates, drains, no leaks" },
+    { text: "Dryer: run briefly — heats, tumbles, vents properly" },
+  ]},
+  { icon: "🔒", title: "Safety & Building Systems", items: [
+    { text: "Smoke detectors present and test button works" },
+    { text: "Carbon monoxide detector present and test button works" },
+    { text: "Intercom/buzzer: test apartment buzzer and front-door communication" },
+    { text: "All keys received and functional: apartment, mailbox, any storage or amenity keys" },
+  ]},
+  { icon: "📋", title: "Contract & Included Items", items: [
+    { text: "All contract-included items remain: AC units, shades/blinds, shelving, appliances, light fixtures, custom hardware" },
+    { text: "Light fixtures and window treatments match contract rider — no substitutions" },
+    { text: "80% carpet rule: note bare floor areas; confirm not immediately out of compliance" },
+  ]},
+  { icon: "🐛", title: "Pest & Odor", items: [
+    { text: "Check for roach traps/bait, droppings, dead insects, or signs of mice" },
+    { text: "Check for smoke smell, mold/mildew, pet odors, or strong masking fragrances" },
+  ]},
+  { icon: "🏢", title: "Noise & Building Conditions", items: [
+    { text: "Open windows and listen: traffic, rooftop HVAC, construction, neighbor noise" },
+    { text: "Inspect hallways, lobby, and elevator for damage or ongoing construction" },
+    { text: "Note scaffolding, facade work, or Local Law construction sheds on exterior" },
+  ]},
+  { icon: "📸", title: "Final Steps Before Closing", items: [
+    { text: "Photograph/video all rooms; document all issues found" },
+    { text: "Simultaneous load test: faucets + lights + oven + burners + dishwasher + HVAC at same time" },
+    { text: "Apartment in substantially same condition as at contract signing" },
+    { text: "No new damage; all systems operational; all included items present" },
+    { text: "COI submitted to building" },
+    { text: "Escrow holdback agreement drafted for any unresolved issues" },
+  ]},
+];
+
+function buildUI() {
+  const container = document.getElementById('sections');
+  sections.forEach((sec, si) => {
+    const el = document.createElement('div');
+    el.className = 'section';
+    el.id = `sec-${si}`;
+
+    el.innerHTML = `
+      <div class="sec-header" onclick="toggleSec(${si})">
+        <span class="sec-title"><span class="sec-icon">${sec.icon}</span>${sec.title}</span>
+        <span class="sec-meta"><span class="sec-count" id="sc-${si}">0/${sec.items.length}</span><span class="chevron">▾</span></span>
+      </div>
+      <div class="sec-body" id="sb-${si}">
+        ${sec.items.map((item, ii) => `
+          <div class="item" id="item-${si}-${ii}">
+            <input type="checkbox" id="chk-${si}-${ii}" onchange="onCheck(${si},${ii})">
+            <div class="item-text">
+              <label class="item-label" for="chk-${si}-${ii}">${item.text}</label>
+              ${item.note ? `<div class="item-note">${item.note}</div>` : ''}
+              <div class="item-status">
+                <button onclick="setStatus(${si},${ii},'OK')" id="st-ok-${si}-${ii}">✓ OK</button>
+                <button onclick="setStatus(${si},${ii},'Issue')" id="st-issue-${si}-${ii}">⚠ Issue</button>
+                <button onclick="setStatus(${si},${ii},'N/A')" id="st-na-${si}-${ii}">N/A</button>
+              </div>
+            </div>
+          </div>`).join('')}
+        <div class="comments-wrap">
+          <div class="comments-label">Section comments</div>
+          <textarea id="comment-${si}" placeholder="Note any issues, concerns, or follow-up items for this section…"></textarea>
+        </div>
+      </div>`;
+    container.appendChild(el);
+  });
+
+  document.getElementById('meta-date').value = new Date().toISOString().split('T')[0];
+  updateProgress();
+}
+
+const statuses = {};
+function setStatus(si, ii, val) {
+  const key = `${si}-${ii}`;
+  statuses[key] = statuses[key] === val ? null : val;
+  ['OK','Issue','N/A'].forEach(s => {
+    const btn = document.getElementById(`st-${s.toLowerCase().replace('/','')}-${si}-${ii}`);
+    if (btn) btn.className = statuses[key] === s ? `active-${s.toLowerCase().replace('/','na')}` : '';
+  });
+  // Auto-check if OK or Issue selected
+  const chk = document.getElementById(`chk-${si}-${ii}`);
+  if (val === 'OK' || val === 'Issue') { chk.checked = true; onCheck(si, ii, true); }
+}
+
+function onCheck(si, ii, skipStatus) {
+  const chk = document.getElementById(`chk-${si}-${ii}`);
+  const itemEl = document.getElementById(`item-${si}-${ii}`);
+  itemEl.classList.toggle('checked', chk.checked);
+  updateProgress();
+}
+
+function updateProgress() {
+  const all = document.querySelectorAll('input[type=checkbox]');
+  const checked = [...all].filter(b => b.checked).length;
+  document.getElementById('prog-label').textContent = `${checked} / ${all.length} checked`;
+  document.getElementById('prog-fill').style.width = all.length ? (checked/all.length*100)+'%' : '0%';
+  sections.forEach((sec, si) => {
+    const boxes = document.querySelectorAll(`#sb-${si} input[type=checkbox]`);
+    const done = [...boxes].filter(b => b.checked).length;
+    document.getElementById(`sc-${si}`).textContent = `${done}/${boxes.length}`;
+  });
+}
+
+function toggleSec(si) {
+  document.getElementById(`sec-${si}`).classList.toggle('collapsed');
+}
+
+function resetAll() {
+  if (!confirm('Reset all checkboxes and comments?')) return;
+  document.querySelectorAll('input[type=checkbox]').forEach(b => b.checked = false);
+  document.querySelectorAll('.item').forEach(el => el.classList.remove('checked'));
+  document.querySelectorAll('textarea').forEach(t => t.value = '');
+  Object.keys(statuses).forEach(k => delete statuses[k]);
+  document.querySelectorAll('.item-status button').forEach(b => b.className = '');
+  updateProgress();
+}
+
+function exportToExcel() {
+  const wb = XLSX.utils.book_new();
+  const ws_data = [];
+
+  // Title block
+  const addr = document.getElementById('meta-address').value || '—';
+  const date = document.getElementById('meta-date').value || '—';
+  const inspector = document.getElementById('meta-inspector').value || '—';
+  const broker = document.getElementById('meta-broker').value || '—';
+
+  ws_data.push(['NYC CO-OP APARTMENT — FINAL WALK-THROUGH CHECKLIST']);
+  ws_data.push([]);
+  ws_data.push(['Address:', addr, '', 'Date:', date]);
+  ws_data.push(['Inspector:', inspector, '', 'Broker/Attorney:', broker]);
+  ws_data.push([]);
+  ws_data.push(['SECTION', 'ITEM', 'CHECKED', 'STATUS', 'NOTES/ISSUES']);
+
+  sections.forEach((sec, si) => {
+    ws_data.push([]);
+    ws_data.push([sec.icon + ' ' + sec.title.toUpperCase()]);
+
+    sec.items.forEach((item, ii) => {
+      const checked = document.getElementById(`chk-${si}-${ii}`).checked;
+      const status = statuses[`${si}-${ii}`] || '';
+      ws_data.push(['', item.text, checked ? 'YES' : 'NO', status, '']);
+    });
+
+    const comment = document.getElementById(`comment-${si}`).value.trim();
+    ws_data.push(['', 'Section Comments:', '', '', comment]);
+  });
+
+  // Summary tab
+  const sum_data = [['NYC CO-OP WALK-THROUGH — SUMMARY'], []];
+  sum_data.push(['Address', addr]);
+  sum_data.push(['Date', date]);
+  sum_data.push(['Inspector', inspector]);
+  sum_data.push([]);
+  sum_data.push(['SECTION', 'ITEMS', 'CHECKED', 'ISSUES', 'COMMENTS']);
+
+  sections.forEach((sec, si) => {
+    const boxes = sec.items.map((_, ii) => document.getElementById(`chk-${si}-${ii}`).checked);
+    const issues = sec.items.filter((_, ii) => statuses[`${si}-${ii}`] === 'Issue').length;
+    const comment = document.getElementById(`comment-${si}`).value.trim();
+    sum_data.push([
+      sec.icon + ' ' + sec.title,
+      sec.items.length,
+      boxes.filter(Boolean).length,
+      issues || '',
+      comment
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+  const ws_sum = XLSX.utils.aoa_to_sheet(sum_data);
+
+  // Column widths
+  ws['!cols'] = [{wch:30},{wch:52},{wch:10},{wch:10},{wch:40}];
+  ws_sum['!cols'] = [{wch:34},{wch:8},{wch:10},{wch:8},{wch:50}];
+
+  XLSX.utils.book_append_sheet(wb, ws_sum, 'Summary');
+  XLSX.utils.book_append_sheet(wb, ws, 'Full Checklist');
+
+  const filename = `walkthrough_${addr.replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_').slice(0,30)}_${date}.xlsx`;
+  XLSX.writeFile(wb, filename);
+}
+
+buildUI();
+</script>
+</body>
+</html>
